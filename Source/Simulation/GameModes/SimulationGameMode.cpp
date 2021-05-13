@@ -1,8 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SimulationGameMode.h"
-#include "SimulationHUD.h"
-#include "SimulationCharacter.h"
+#include "Simulation/HUDs/SimulationHUD.h"
+#include "Simulation/Characters/SimulationCharacter.h"
 #include "UObject/ConstructorHelpers.h"
 
 ASimulationGameMode::ASimulationGameMode()

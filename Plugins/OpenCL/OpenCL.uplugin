@@ -1,0 +1,25 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "OpenCL Adapter Plugin",
+	"Description": "",
+	"Category": "Computing",
+	"CreatedBy": "",
+	"CreatedByURL": "",
+	"DocsURL": "https://github.com/getnamo/opencl-ue4",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"EnabledByDefault": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "OpenCL",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

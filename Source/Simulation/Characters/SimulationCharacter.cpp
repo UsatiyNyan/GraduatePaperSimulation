@@ -1,7 +1,7 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SimulationCharacter.h"
-#include "SimulationProjectile.h"
+#include "Simulation/Actors/SimulationProjectile.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -43,7 +43,7 @@ ASimulationCharacter::ASimulationCharacter()
 
 	// Create a gun mesh component
 	FP_Gun = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FP_Gun"));
-	FP_Gun->SetOnlyOwnerSee(false);			// otherwise won't be visible in the multiplayer
+	FP_Gun->SetOnlyOwnerSee(false); // otherwise won't be visible in the multiplayer
 	FP_Gun->bCastDynamicShadow = false;
 	FP_Gun->CastShadow = false;
 	// FP_Gun->SetupAttachment(Mesh1P, TEXT("GripPoint"));
@@ -69,7 +69,7 @@ ASimulationCharacter::ASimulationCharacter()
 	// Create a gun and attach it to the right-hand VR controller.
 	// Create a gun mesh component
 	VR_Gun = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("VR_Gun"));
-	VR_Gun->SetOnlyOwnerSee(false);			// otherwise won't be visible in the multiplayer
+	VR_Gun->SetOnlyOwnerSee(false); // otherwise won't be visible in the multiplayer
 	VR_Gun->bCastDynamicShadow = false;
 	VR_Gun->CastShadow = false;
 	VR_Gun->SetupAttachment(R_MotionController);
@@ -78,7 +78,7 @@ ASimulationCharacter::ASimulationCharacter()
 	VR_MuzzleLocation = CreateDefaultSubobject<USceneComponent>(TEXT("VR_MuzzleLocation"));
 	VR_MuzzleLocation->SetupAttachment(VR_Gun);
 	VR_MuzzleLocation->SetRelativeLocation(FVector(0.000004, 53.999992, 10.000000));
-	VR_MuzzleLocation->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));		// Counteract the rotation of the VR gun model.
+	VR_MuzzleLocation->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f)); // Counteract the rotation of the VR gun model.
 
 	// Uncomment the following line to turn motion controllers on by default:
 	//bUsingMotionControllers = true;
@@ -90,7 +90,8 @@ void ASimulationCharacter::BeginPlay()
 	Super::BeginPlay();
 
 	//Attach gun mesh component to Skeleton, doing it here because the skeleton is not yet created in the constructor
-	FP_Gun->AttachToComponent(Mesh1P, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
+	FP_Gun->AttachToComponent(Mesh1P, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+	                          TEXT("GripPoint"));
 
 	// Show or hide the two versions of the gun based on whether or not we're using motion controllers.
 	if (bUsingMotionControllers)
@@ -156,14 +157,18 @@ void ASimulationCharacter::OnFire()
 			{
 				const FRotator SpawnRotation = GetControlRotation();
 				// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
-				const FVector SpawnLocation = ((FP_MuzzleLocation != nullptr) ? FP_MuzzleLocation->GetComponentLocation() : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
+				const FVector SpawnLocation = ((FP_MuzzleLocation != nullptr)
+					                               ? FP_MuzzleLocation->GetComponentLocation()
+					                               : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
 
 				//Set Spawn Collision Handling Override
 				FActorSpawnParameters ActorSpawnParams;
-				ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+				ActorSpawnParams.SpawnCollisionHandlingOverride =
+					ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
 
 				// spawn the projectile at the muzzle
-				World->SpawnActor<ASimulationProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, ActorSpawnParams);
+				World->SpawnActor<ASimulationProjectile>(ProjectileClass, SpawnLocation, SpawnRotation,
+				                                         ActorSpawnParams);
 			}
 		}
 	}
@@ -295,6 +300,6 @@ bool ASimulationCharacter::EnableTouchscreenMovement(class UInputComponent* Play
 		//PlayerInputComponent->BindTouch(EInputEvent::IE_Repeat, this, &ASimulationCharacter::TouchUpdate);
 		return true;
 	}
-	
+
 	return false;
 }
