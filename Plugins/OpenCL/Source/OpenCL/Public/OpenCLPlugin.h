@@ -15,30 +15,30 @@ DECLARE_LOG_CATEGORY_EXTERN(LogOpenCL, All, All);
 class OpenCLPlugin : public IModuleInterface
 {
 public:
-	static inline OpenCLPlugin& Get()
-	{
-		return FModuleManager::LoadModuleChecked<OpenCLPlugin>("OpenCL");
-	}
+    static inline OpenCLPlugin& Get()
+    {
+        return FModuleManager::LoadModuleChecked<OpenCLPlugin>("OpenCL");
+    }
 
-	static inline bool IsAvailable()
-	{
-		return FModuleManager::Get().IsModuleLoaded("OpenCL");
-	}
+    static inline bool IsAvailable()
+    {
+        return FModuleManager::Get().IsModuleLoaded("OpenCL");
+    }
 
-	virtual void StartupModule() override;
-	virtual void ShutdownModule() override;
+    virtual void StartupModule() override;
+    virtual void ShutdownModule() override;
 
-	void EnumerateDevices(TArray<FOpenCLDeviceData>& OutDevices, bool bForceRefresh = false);
-	void RunKernelOnDevices(const FString& KernelString,
-	                        const FString& KernelName,
-	                        const FString& Args,
-	                        TFunction<void(const FString&, bool)> ResultCallback,
-	                        const TArray<FOpenCLDeviceData>& OutDevices);
+    void EnumerateDevices(TArray<FOpenCLDeviceData>& OutDevices, bool bForceRefresh = false);
+    void RunKernelOnDevices(const FString& KernelString,
+                            const FString& KernelName,
+                            const FString& Args,
+                            TFunction<void(const FString&, bool)> ResultCallback,
+                            const TArray<FOpenCLDeviceData>& OutDevices);
 private:
-	void FreeDeviceMemory();
+    void FreeDeviceMemory();
 
 private:
-	TArray<FOpenCLDeviceData> Devices;
-	TArray<cl_device_id*> DeviceIdsMemoryList;
-	bool bHasEnumeratedOnce{};
+    TArray<FOpenCLDeviceData> Devices;
+    TArray<cl_device_id*> DeviceIdsMemoryList;
+    bool bHasEnumeratedOnce{};
 };

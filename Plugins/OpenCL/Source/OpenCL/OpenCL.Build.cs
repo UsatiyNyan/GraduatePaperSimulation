@@ -34,8 +34,8 @@ public class OpenCL : ModuleRules
 				"RHI"
 			}
 		);
-		
-		
+
+
 		string PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "Win64" : "Win32";
 		string OpenCLLibrariesPath = Path.Combine(ModuleDirectory, "Lib");
 		string NvidiaLibrariesPath = Path.Combine(OpenCLLibrariesPath, "NVIDIA", PlatformString);
