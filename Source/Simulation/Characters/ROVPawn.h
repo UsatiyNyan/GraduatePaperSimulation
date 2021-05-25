@@ -27,6 +27,10 @@ protected:
     void PitchRotation(float Amount);
     void YawRotation(float Amount);
 
+    void Scroll(float Amount);
+
+    void Stop();
+
 private:
     FVector Velocity;
     

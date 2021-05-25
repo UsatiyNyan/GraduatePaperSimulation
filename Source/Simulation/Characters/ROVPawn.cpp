@@ -2,8 +2,6 @@
 
 #include "ROVPawn.h"
 
-#include <cassert>
-
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/CollisionProfile.h"
@@ -73,6 +71,10 @@ void AROVPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
     PlayerInputComponent->BindAxis("RollRotation", this, &AROVPawn::RollRotation);
     PlayerInputComponent->BindAxis("PitchRotation", this, &AROVPawn::PitchRotation);
     PlayerInputComponent->BindAxis("YawRotation", this, &AROVPawn::YawRotation);
+    
+    PlayerInputComponent->BindAxis("Scroll", this, &AROVPawn::Scroll);
+    
+    PlayerInputComponent->BindAction("Stop", EInputEvent::IE_Pressed, this, &AROVPawn::Stop);
 }
 
 void AROVPawn::MoveForward(float Amount)
@@ -101,6 +103,18 @@ void AROVPawn::YawRotation(float Amount)
     if (Amount == 0.f) { return; }
 
     AddActorLocalRotation(FQuat{FRotator{0.f, Amount, 0.f}});
+}
+
+void AROVPawn::Scroll(float Amount)
+{
+    if (Amount == 0.f) { return; }
+
+    CameraBoom->TargetArmLength += 10 * Amount;
+}
+
+void AROVPawn::Stop()
+{
+    Velocity.Set(0.f, 0.f, 0.f);
 }
 
 UPawnMovementComponent* AROVPawn::GetMovementComponent() const
