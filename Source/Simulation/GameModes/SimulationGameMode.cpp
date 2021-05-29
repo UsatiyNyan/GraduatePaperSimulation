@@ -7,6 +7,4 @@
 ASimulationGameMode::ASimulationGameMode()
     : Super()
 {
-    // set default pawn class to our Blueprinted character
-    // DefaultPawnClass = AROVPawn::StaticClass();
 }

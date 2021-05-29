@@ -1,64 +1,105 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Illarionov Kirill's Graduation Project for BMSTU
 
 #pragma once
 
 #include "CoreMinimal.h"
+
+#include <vector>
+
 #include "GameFramework/Pawn.h"
+#include "PhysicsEngine/PhysicsConstraintComponent.h"
+#include "Simulation/Components/CablePiece.h"
 #include "ROVPawn.generated.h"
 
 UCLASS(config=Game)
 class SIMULATION_API AROVPawn : public APawn
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-    AROVPawn();
+	AROVPawn();
 
 protected:
-    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-public:
-    virtual void Tick(float DeltaTime) override;
-
-protected:
-    void MoveForward(float Amount);
-
-    void RollRotation(float Amount);
-    void PitchRotation(float Amount);
-    void YawRotation(float Amount);
-
-    void Scroll(float Amount);
-
-    void Stop();
+	virtual void BeginPlay() override;
+	
+public:	
+	virtual void Tick(float DeltaTime) override;
 
 private:
-    FVector Velocity;
-    
-public:
-    /** Base turn rate, in deg/sec. Other scaling may affect final turn rate. */
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
-    float YawRate{1.f};
-
-    /** Base look up/down rate, in deg/sec. Other scaling may affect final rate. */
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
-    float PitchRate{1.f};
-
-public:
-    virtual UPawnMovementComponent* GetMovementComponent() const override;
+	void ApplyForcesToCables();
 
 protected:
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Pawn, meta=(AllowPrivateAccess="true"))
-    class UCapsuleComponent* CapsuleComponent;
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Pawn, meta=(AllowPrivateAccess="true"))
-    class UPawnMovementComponent* MovementComponent;
+	void MoveForward(float Amount);
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera, meta=(AllowPrivateAccess="true"))
-    class USpringArmComponent* CameraBoom;
+	void RollRotation(float Amount);
+	void PitchRotation(float Amount);
+	void YawRotation(float Amount);
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera, meta=(AllowPrivateAccess="true"))
-    class UCameraComponent* FollowCamera;
+	void Scroll(float Amount);
 
-    // UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Pawn, meta=(AllowPrivateAccess="true"))
-    // UMeshComponent* Mesh;
+	void Stop();
+
+public:
+	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite)
+	float MinLooseness{1.3f};
+
+	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite)
+	float MaxLooseness{1.6f};
+
+	UPROPERTY(Category=ROV, EditAnywhere, BlueprintReadWrite)
+	float DragCoefficient{0.22f};
+	
+	UPROPERTY(Category=Cable, EditAnywhere, BlueprintReadWrite)
+	FComponentReference AttachEndTo{};
+	
+	UPROPERTY(Category=Cable, EditAnywhere, BlueprintReadWrite)
+	FName AttachEndToSocketName{};
+
+	UPROPERTY(Category=Cable, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="kg/m^3"))
+	float CableDensity{1025.f};
+	
+	UPROPERTY(Category=Cable, EditAnywhere, BlueprintReadWrite)
+	float CableNormalCoefficient{1.2f};
+
+	UPROPERTY(Category=Cable, EditAnywhere, BlueprintReadWrite)
+	float CableTangentCoefficient{0.2f};
+
+	UPROPERTY(Category=WaterEnvironment, EditAnywhere, BlueprintReadWrite)
+	FVector FlowVelocity{GetActorForwardVector() * -1};
+
+	UPROPERTY(Category=WaterEnvironment, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="kg/m^3"))
+	float WaterDensity{1025.f};
+	
+private:
+	FVector CableWeightAndWaterDisplacementForce; // precalculated in BeginPlay
+	float OneCableTangentResistancePrecalculated; // precalculated in BeginPlay
+	float OneCableNormalResistancePrecalculated; // precalculated in BeginPlay
+	float CableOneLengthSquared; // precalculated in BeginPlay
+	float CableDiameter;
+	float CableOneLength;
+	
+	std::vector<std::pair<UCablePiece*, UPhysicsConstraintComponent*>> CablePiecesAndConstraints;
+	UPhysicsConstraintComponent* FinalPhysicsConstraintComponent;
+
+public:
+	virtual UPawnMovementComponent* GetMovementComponent() const override;
+
+protected:
+	UPROPERTY(Category=Pawn, VisibleAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	class UFloatingPawnMovement* MovementComponent;
+
+	UPROPERTY(Category=Camera, VisibleAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	class USpringArmComponent* CameraBoomComponent;
+
+	UPROPERTY(Category=Camera, VisibleAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	class UCameraComponent* FollowCameraComponent;
+
+	UPROPERTY(Category=Mesh, VisibleAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	UStaticMeshComponent* MeshComponent;
+	
+private:
+	UPrimitiveComponent* GetEndComponent();
+	FVector GetEndPosition();
 };
