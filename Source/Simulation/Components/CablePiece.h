@@ -8,7 +8,7 @@
 #include "CablePiece.generated.h"
 
 
-UCLASS(config=Game)
+UCLASS(Config=Game)
 class SIMULATION_API UCablePiece : public UStaticMeshComponent
 {
 	GENERATED_BODY()
@@ -17,9 +17,11 @@ public:
 	static constexpr auto EndSocketName = "EndSocket";
 
 	UCablePiece();
-	void SetupThis(uint32_t CableId, float Density, UPhysicsConstraintComponent* CreatedPhysicsConstraintComponent,
+	void SetupThis(uint32_t CableId, float Density, float WaterDensity, UPhysicsConstraintComponent* CreatedPhysicsConstraintComponent,
 	               UPrimitiveComponent* AttachableComponent, const FName AttachableComponentSocketName);
 	virtual ~UCablePiece() override;
+
+	FVector GetWaterDisplacementForce() const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -30,6 +32,7 @@ public:
 
 private:
 	uint32_t Id;
+	FVector WaterDisplacementForce;
 	UPhysicsConstraintComponent* WeakPhysicsConstraintComponent;
 	UPrimitiveComponent* WeakAttachableComponent;
 };

@@ -10,6 +10,8 @@
 #include "GameFramework/FloatingPawnMovement.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Math/UnrealMathUtility.h"
+#include "Simulation/Components/FinalCablePiece.h"
+#include "Simulation/Components/WinchControlSystems/SimpleWinchControlSystem.h"
 
 constexpr auto ROVMeshCableSocketName = "CableSocket";
 
@@ -67,160 +69,101 @@ void AROVPawn::BeginPlay()
 	Super::BeginPlay();
 
 	// precalculated values
-	CableOneLengthSquared = FMath::Pow(CableOneLength, 2);
-
 	OneCableTangentResistancePrecalculated = CableTangentCoefficient * PI * CableDiameter * CableOneLength *
 		WaterDensity / 2;
 
 	OneCableNormalResistancePrecalculated = CableNormalCoefficient * CableDiameter * CableOneLength *
 		WaterDensity / 2;
 
-	float OneCableVolume = CableOneLength * FMath::Pow(CableDiameter / 2, 2);
-	constexpr float GravityConstant = 9.8f;
-	CableWeightAndWaterDisplacementForce =
-		FVector{0.f, 0.f, GravityConstant} *
-		OneCableVolume *
-		(WaterDensity - CableDensity);
-
 	// initial cable length
-	FVector Delta = GetEndPosition() - MeshComponent->GetSocketLocation(ROVMeshCableSocketName);
-	uint32_t InitialCableAmount = Delta.Size() / CableOneLength;
+	const FVector Delta = GetEndPosition() - MeshComponent->GetSocketLocation(ROVMeshCableSocketName);
+	const FRotator DeltaRotation = Delta.Rotation();
+	const uint32_t InitialCableAmount = Delta.Size() / CableOneLength;
 
-	if (InitialCableAmount == 0) { return; }
-
-	auto FirstCablePiece = NewObject<UCablePiece>(this, ToCStr("CablePiece" + FString::FromInt(0)));
-	auto FirstPhysicsConstraintComponent = NewObject<UPhysicsConstraintComponent>(this,
-		ToCStr("PhysicsConstraint" + FString::FromInt(0)));
-	FirstCablePiece->SetupThis(0, CableDensity, FirstPhysicsConstraintComponent,
-	                           MeshComponent, ROVMeshCableSocketName);
-	FirstCablePiece->SetWorldRotation(Delta.Rotation());
-	FirstCablePiece->RegisterComponent();
-	FirstPhysicsConstraintComponent->RegisterComponent();
-
-	CablePiecesAndConstraints.emplace_back(FirstCablePiece, FirstPhysicsConstraintComponent);
-
-	for (uint32_t i = 1; i < InitialCableAmount; ++i)
+	for (uint32_t i = 0; i < InitialCableAmount; ++i)
 	{
-		auto NewCablePiece = NewObject<UCablePiece>(this, ToCStr("CablePiece" + FString::FromInt(i)));
-		auto NewPhysicsConstraintComponent = NewObject<UPhysicsConstraintComponent>(this,
-			ToCStr("PhysicsConstraint" + FString::FromInt(i)));
-		NewCablePiece->SetupThis(i, CableDensity, NewPhysicsConstraintComponent,
-		                         CablePiecesAndConstraints.back().first, UCablePiece::EndSocketName);
-		NewCablePiece->SetWorldRotation(Delta.Rotation());
-		NewCablePiece->RegisterComponent();
-		NewPhysicsConstraintComponent->RegisterComponent();
-
-		CablePiecesAndConstraints.emplace_back(NewCablePiece, NewPhysicsConstraintComponent);
+		CreateCablePiece(DeltaRotation);
 	}
 
 	// FinalPhysicsConstraintComponent
-	FinalPhysicsConstraintComponent = NewObject<UPhysicsConstraintComponent>(
-		this, "FinalPhysicsConstraintComponent");
-	FinalPhysicsConstraintComponent->SetRelativeRotation(FRotator{90.f, 0.f, 0.f});
-	FinalPhysicsConstraintComponent->SetAngularTwistLimit(ACM_Free, 0.f);
-	FinalPhysicsConstraintComponent->SetAngularSwing1Limit(ACM_Free, 0.f);
-	FinalPhysicsConstraintComponent->SetAngularSwing2Limit(ACM_Free, 0.f);
-	FinalPhysicsConstraintComponent->SetLinearXLimit(LCM_Locked, CableOneLength);
-	FinalPhysicsConstraintComponent->SetLinearYLimit(LCM_Locked, CableOneLength);
-	FinalPhysicsConstraintComponent->SetLinearZLimit(LCM_Locked, CableOneLength);
-	FinalPhysicsConstraintComponent->
-		SetupAttachment(CablePiecesAndConstraints.back().first, UCablePiece::EndSocketName);
-	FinalPhysicsConstraintComponent->SetConstrainedComponents(
-		CablePiecesAndConstraints.back().first, NAME_None, GetEndComponent(), NAME_None);
-	FinalPhysicsConstraintComponent->RegisterComponent();
+	AddFinalPieceAndConstraint(Delta.Size() - InitialCableAmount * CableOneLength, DeltaRotation);
+
+	// WinchControlSystem
+	WinchControlSystem = std::make_unique<FSimpleWinchControlSystem>(Delta.Size(), MinWinchVelocity, MaxWinchVelocity,
+	                                                                 MinLooseness, MaxLooseness);
 }
 
 void AROVPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	const auto EndComponent = GetEndComponent();
-	const auto EndPosition = GetEndPosition();
-
-	const FVector AbsoluteDelta = (RootComponent->GetComponentLocation() - EndPosition).GetAbs();
-	const float WholeCableLength = CableOneLength * CablePiecesAndConstraints.size();
-	const float CurrentLooseness = WholeCableLength / AbsoluteDelta.Size();
-	if (CurrentLooseness < MinLooseness)
-	{
-		// 	// TODO: ask system to extend with speed
-		// extend cable
-
-		const float DesiredLengthOfCable = MinLooseness * AbsoluteDelta.Size();
-		const uint32_t DesiredCablePiecesAmount = DesiredLengthOfCable / CableOneLength;
-		const uint32_t AlreadyPresentCablePiecesAmount = CablePiecesAndConstraints.size();
-
-		for (uint32_t i = AlreadyPresentCablePiecesAmount; i < DesiredCablePiecesAmount; ++i)
-		{
-			auto NewCablePiece = NewObject<UCablePiece>(this, ToCStr("CablePiece" + FString::FromInt(i)));
-			auto NewPhysicsConstraintComponent = NewObject<UPhysicsConstraintComponent>(this,
-				ToCStr("PhysicsConstraint" + FString::FromInt(i)));
-			if (CablePiecesAndConstraints.size() == 0)
-			{
-				NewCablePiece->SetupThis(0, CableDensity, NewPhysicsConstraintComponent,
-				                         MeshComponent, ROVMeshCableSocketName);
-			}
-			else
-			{
-				NewCablePiece->SetupThis(i, CableDensity, NewPhysicsConstraintComponent,
-				                         CablePiecesAndConstraints.back().first, UCablePiece::EndSocketName);
-			}
-
-			NewCablePiece->RegisterComponent();
-			NewPhysicsConstraintComponent->RegisterComponent();
-
-			if (i == DesiredCablePiecesAmount - 1)
-			{
-				if (FinalPhysicsConstraintComponent)
-				{
-					FinalPhysicsConstraintComponent->UnregisterComponent();
-				}
-				// FinalPhysicsConstraintComponent
-				FinalPhysicsConstraintComponent = NewObject<UPhysicsConstraintComponent>(
-					this, "FinalPhysicsConstraintComponent");
-				FinalPhysicsConstraintComponent->SetRelativeRotation(FRotator{90.f, 0.f, 0.f});
-				FinalPhysicsConstraintComponent->SetAngularTwistLimit(ACM_Locked, 0.f);
-				FinalPhysicsConstraintComponent->SetAngularSwing1Limit(ACM_Free, 0.f);
-				FinalPhysicsConstraintComponent->SetAngularSwing2Limit(ACM_Free, 0.f);
-				FinalPhysicsConstraintComponent->SetLinearXLimit(LCM_Locked, 0.f);
-				FinalPhysicsConstraintComponent->SetLinearYLimit(LCM_Locked, 0.f);
-				FinalPhysicsConstraintComponent->SetLinearZLimit(LCM_Locked, 0.f);
-				FinalPhysicsConstraintComponent->SetupAttachment(NewCablePiece, UCablePiece::EndSocketName);
-				FinalPhysicsConstraintComponent->SetConstrainedComponents(
-					NewCablePiece, NAME_None, EndComponent, NAME_None);
-				FinalPhysicsConstraintComponent->RegisterComponent();
-			}
-
-			CablePiecesAndConstraints.emplace_back(NewCablePiece, NewPhysicsConstraintComponent);
-		}
-	}
-	else if (CurrentLooseness > MaxLooseness)
-	{
-		// retract cable
-	}
-
+	TickCable(DeltaTime);
 	ApplyForcesToCables();
 
-	DrawDebugSphere(GetWorld(), FinalPhysicsConstraintComponent->GetComponentLocation(), CableOneLength, 8,
-	                FColor::Red, false, -1, 0, 2);
+	DrawDebugSphere(GetWorld(), GetEndComponent()->GetComponentLocation(), CableOneLength, 12,
+	                FColor::Red, false, -1, 0, 1);
 	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Emerald,
 	                                 "Velocity: " + MovementComponent->Velocity.ToString());
+}
+
+void AROVPawn::TickCable(const float DeltaTime)
+{
+	const FVector EndPosition = GetEndPosition();
+	const FVector ROVPosition = MeshComponent->GetSocketLocation(ROVMeshCableSocketName) - EndPosition;
 	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Emerald,
-	                                 "AbsoluteDelta: " + AbsoluteDelta.ToString());
+	                                 "ROVPosition: " + ROVPosition.ToString());
+
+	WinchControlSystem->Tick(DeltaTime, ROVPosition, MovementComponent->Velocity);
+
+	const float WholeCableDiscreteLength = CableOneLength * CablePiecesAndConstraints.Num();
+	const float WholeCableLength = WinchControlSystem->GetCurrentLength();
+	const float OneCableDeltaLength = WholeCableLength - WholeCableDiscreteLength;
+	float OneCableDeltaLengthAbs = FMath::Abs(OneCableDeltaLength);
+
+	if (OneCableDeltaLengthAbs < std::numeric_limits<float>::epsilon()) // OneCableDeltaLength == 0
+	{
+		return;
+	}
+
+	if (OneCableDeltaLengthAbs >= CableOneLength)
+	{
+		if (OneCableDeltaLength > 0)
+		{
+			// add one cable piece
+			const auto LastAttachableComponentAndSocket = GetLastAttachableComponentAndSocket();
+			FVector Delta = EndPosition -
+				LastAttachableComponentAndSocket.Key->GetSocketLocation(LastAttachableComponentAndSocket.Value);
+			CreateCablePiece(Delta.Rotation());
+		}
+		else // OneCableDeltaLength < 0
+		{
+			// remove one cable piece
+			auto LastCablePieceAndConstraint = CablePiecesAndConstraints.Pop();
+			LastCablePieceAndConstraint.Key->UnregisterComponent();
+			LastCablePieceAndConstraint.Value->UnregisterComponent();
+		}
+	}
+
+	const auto LastAttachableComponentAndSocket = GetLastAttachableComponentAndSocket();
+	FVector Delta = EndPosition -
+		LastAttachableComponentAndSocket.Key->GetSocketLocation(LastAttachableComponentAndSocket.Value);
+	AddFinalPieceAndConstraint(Delta.Size(), Delta.Rotation());
 }
 
 void AROVPawn::ApplyForcesToCables()
 {
 	for (auto& CablePieceAndPhysicsConstraint : CablePiecesAndConstraints)
 	{
-		auto* CablePiece = CablePieceAndPhysicsConstraint.first;
+		auto* CablePiece = CablePieceAndPhysicsConstraint.Key;
 		FVector Rotation = CablePiece->GetSocketLocation(UCablePiece::EndSocketName) -
 			CablePiece->GetComponentLocation();
 
-		FVector TangentVelocity = FlowVelocity.ProjectOnTo(Rotation);
-		FVector NormalVelocity = FlowVelocity - TangentVelocity;
+		FVector TotalVelocity = (FlowVelocity - MovementComponent->Velocity) / 100;
+		FVector TangentVelocity = TotalVelocity.ProjectOnTo(Rotation);
+		FVector NormalVelocity = TotalVelocity - TangentVelocity;
 
 		DrawDebugDirectionalArrow(GetWorld(), CablePiece->GetComponentLocation(),
-		                          CablePiece->GetComponentLocation() + FlowVelocity.GetSafeNormal() * CableOneLength,
+		                          CablePiece->GetComponentLocation() + TotalVelocity.GetSafeNormal() * CableOneLength,
 		                          15, FColor::Blue, false, -1, 0, 6);
 
 		DrawDebugDirectionalArrow(GetWorld(), CablePiece->GetComponentLocation(),
@@ -233,9 +176,78 @@ void AROVPawn::ApplyForcesToCables()
 
 		FVector TangentForce = TangentVelocity.SizeSquared() * TangentVelocity.GetSafeNormal();
 		FVector NormalForce = NormalVelocity.SizeSquared() * NormalVelocity.GetSafeNormal();
-		CablePiece->AddForce(CableWeightAndWaterDisplacementForce + TangentForce + NormalForce);
+		CablePiece->AddForce(CablePiece->GetWaterDisplacementForce() + TangentForce + NormalForce);
 	}
 }
+
+void AROVPawn::CreateCablePiece(FRotator Rotation)
+{
+	uint32_t Id = CablePiecesAndConstraints.Num();
+	const auto LastAttachableComponentAndSocket = GetLastAttachableComponentAndSocket();
+
+	auto NewCablePiece = NewObject<UCablePiece>(this, ToCStr("CablePiece" + FString::FromInt(Id)));
+	auto NewPhysicsConstraintComponent = NewObject<UPhysicsConstraintComponent>(this,
+		ToCStr("PhysicsConstraint" + FString::FromInt(Id)));
+	NewCablePiece->SetupThis(Id, CableDensity, WaterDensity, NewPhysicsConstraintComponent,
+	                         LastAttachableComponentAndSocket.Key, LastAttachableComponentAndSocket.Value);
+	NewCablePiece->SetWorldRotation(Rotation);
+	NewCablePiece->RegisterComponent();
+	NewPhysicsConstraintComponent->RegisterComponent();
+
+	CablePiecesAndConstraints.Emplace(NewCablePiece, NewPhysicsConstraintComponent);
+}
+
+void AROVPawn::AddFinalPieceAndConstraint(const float Radius, const FRotator& Rotation)
+{
+	const auto LastAttachableComponentAndSocket = GetLastAttachableComponentAndSocket();
+
+	if (!FinalCablePiece)
+	{
+		FinalCablePiece = NewObject<UFinalCablePiece>(this, "FinalCablePiece");
+	}
+
+	if (!FinalConstraint)
+	{
+		FinalConstraint = NewObject<UPhysicsConstraintComponent>(this, "FinalConstraint");
+	}
+
+	if (!CableToEndpointConstraint)
+	{
+		CableToEndpointConstraint = NewObject<UPhysicsConstraintComponent>(this, "CableToEndpointConstraint");
+	}
+
+	FinalCablePiece->SetLength(Radius);
+	FinalCablePiece->SetupThis(-1, CableDensity, WaterDensity, FinalConstraint,
+	                           LastAttachableComponentAndSocket.Key, LastAttachableComponentAndSocket.Value);
+	FinalCablePiece->SetWorldRotation(Rotation);
+
+	if (!FinalCablePiece->IsRegistered())
+	{
+		FinalCablePiece->RegisterComponent();
+	}
+
+	if (!FinalConstraint->IsRegistered())
+	{
+		FinalConstraint->RegisterComponent();
+	}
+	
+	if (!CableToEndpointConstraint->IsRegistered())
+	{
+		
+		CableToEndpointConstraint->SetAngularTwistLimit(ACM_Locked, 0);
+		CableToEndpointConstraint->SetAngularSwing1Limit(ACM_Limited, 90);
+		CableToEndpointConstraint->SetAngularSwing2Limit(ACM_Limited, 90);
+		CableToEndpointConstraint->SetLinearXLimit(LCM_Limited, 50.f);
+		CableToEndpointConstraint->SetLinearYLimit(LCM_Limited, 50.f);
+		CableToEndpointConstraint->SetLinearZLimit(LCM_Limited, 50.f);
+		CableToEndpointConstraint->SetAngularDriveParams(1000, 1000, 10);
+		CableToEndpointConstraint->SetLinearDriveParams(1000, 1000, 10);
+		CableToEndpointConstraint->SetupAttachment(GetEndComponent(), AttachEndToSocketName);
+		CableToEndpointConstraint->SetConstrainedComponents(GetEndComponent(), NAME_None, FinalCablePiece, NAME_None);
+		CableToEndpointConstraint->RegisterComponent();
+	}
+}
+
 
 void AROVPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -312,4 +324,14 @@ FVector AROVPawn::GetEndPosition()
 	return AttachEndToSocketName != NAME_None
 		       ? EndComponent->GetSocketLocation(AttachEndToSocketName)
 		       : EndComponent->GetComponentLocation();
+}
+
+TPair<UPrimitiveComponent*, FName> AROVPawn::GetLastAttachableComponentAndSocket()
+{
+	if (CablePiecesAndConstraints.Num() == 0)
+	{
+		return TPair<UPrimitiveComponent*, FName>{MeshComponent, ROVMeshCableSocketName};
+	}
+
+	return TPair<UPrimitiveComponent*, FName>{CablePiecesAndConstraints.Last().Key, UCablePiece::EndSocketName};
 }
