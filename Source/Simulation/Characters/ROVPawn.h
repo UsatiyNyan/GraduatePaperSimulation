@@ -31,7 +31,7 @@ private:
 	void TickCable(const float DeltaTime);
 	void ApplyForcesToCables();
 	void CreateCablePiece(FRotator Rotation);
-	void AddFinalPieceAndConstraint(const float Radius, const FRotator& Rotation);
+	void FixLastPiece();
 
 protected: // Inputs
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -59,7 +59,7 @@ public: // Variables
 	float MinWinchVelocity{20.f};
 
 	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="cm/s"))
-	float MaxWinchVelocity{200.f};
+	float MaxWinchVelocity{100.f};
 
 	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite)
 	float MinLooseness{1.3f};
@@ -111,8 +111,5 @@ private:
 	float CableOneLength;
 
 	TArray<TPair<UCablePiece*, UPhysicsConstraintComponent*>> CablePiecesAndConstraints;
-	UFinalCablePiece *FinalCablePiece;
-	UPhysicsConstraintComponent *FinalConstraint;
-	UPhysicsConstraintComponent *CableToEndpointConstraint;
 	std::unique_ptr<IWinchControlSystem> WinchControlSystem;
 };

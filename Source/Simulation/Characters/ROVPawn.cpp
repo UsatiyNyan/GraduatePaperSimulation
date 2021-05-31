@@ -85,9 +85,6 @@ void AROVPawn::BeginPlay()
 		CreateCablePiece(DeltaRotation);
 	}
 
-	// FinalPhysicsConstraintComponent
-	AddFinalPieceAndConstraint(Delta.Size() - InitialCableAmount * CableOneLength, DeltaRotation);
-
 	// WinchControlSystem
 	WinchControlSystem = std::make_unique<FSimpleWinchControlSystem>(Delta.Size(), MinWinchVelocity, MaxWinchVelocity,
 	                                                                 MinLooseness, MaxLooseness);
@@ -100,7 +97,7 @@ void AROVPawn::Tick(float DeltaTime)
 	TickCable(DeltaTime);
 	ApplyForcesToCables();
 
-	DrawDebugSphere(GetWorld(), GetEndComponent()->GetComponentLocation(), CableOneLength, 12,
+	DrawDebugSphere(GetWorld(), GetEndPosition(), CableOneLength, 12,
 	                FColor::Red, false, -1, 0, 1);
 	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Emerald,
 	                                 "Velocity: " + MovementComponent->Velocity.ToString());
@@ -143,11 +140,7 @@ void AROVPawn::TickCable(const float DeltaTime)
 			LastCablePieceAndConstraint.Value->UnregisterComponent();
 		}
 	}
-
-	const auto LastAttachableComponentAndSocket = GetLastAttachableComponentAndSocket();
-	FVector Delta = EndPosition -
-		LastAttachableComponentAndSocket.Key->GetSocketLocation(LastAttachableComponentAndSocket.Value);
-	AddFinalPieceAndConstraint(Delta.Size(), Delta.Rotation());
+	FixLastPiece();
 }
 
 void AROVPawn::ApplyForcesToCables()
@@ -190,6 +183,7 @@ void AROVPawn::CreateCablePiece(FRotator Rotation)
 		ToCStr("PhysicsConstraint" + FString::FromInt(Id)));
 	NewCablePiece->SetupThis(Id, CableDensity, WaterDensity, NewPhysicsConstraintComponent,
 	                         LastAttachableComponentAndSocket.Key, LastAttachableComponentAndSocket.Value);
+	NewPhysicsConstraintComponent->SetDisableCollision(true);
 	NewCablePiece->SetWorldRotation(Rotation);
 	NewCablePiece->RegisterComponent();
 	NewPhysicsConstraintComponent->RegisterComponent();
@@ -197,57 +191,13 @@ void AROVPawn::CreateCablePiece(FRotator Rotation)
 	CablePiecesAndConstraints.Emplace(NewCablePiece, NewPhysicsConstraintComponent);
 }
 
-void AROVPawn::AddFinalPieceAndConstraint(const float Radius, const FRotator& Rotation)
+void AROVPawn::FixLastPiece()
 {
-	const auto LastAttachableComponentAndSocket = GetLastAttachableComponentAndSocket();
+	auto* LastCable = CablePiecesAndConstraints.Last().Key;
 
-	if (!FinalCablePiece)
-	{
-		FinalCablePiece = NewObject<UFinalCablePiece>(this, "FinalCablePiece");
-	}
-
-	if (!FinalConstraint)
-	{
-		FinalConstraint = NewObject<UPhysicsConstraintComponent>(this, "FinalConstraint");
-	}
-
-	if (!CableToEndpointConstraint)
-	{
-		CableToEndpointConstraint = NewObject<UPhysicsConstraintComponent>(this, "CableToEndpointConstraint");
-	}
-
-	FinalCablePiece->SetLength(Radius);
-	FinalCablePiece->SetupThis(-1, CableDensity, WaterDensity, FinalConstraint,
-	                           LastAttachableComponentAndSocket.Key, LastAttachableComponentAndSocket.Value);
-	FinalCablePiece->SetWorldRotation(Rotation);
-
-	if (!FinalCablePiece->IsRegistered())
-	{
-		FinalCablePiece->RegisterComponent();
-	}
-
-	if (!FinalConstraint->IsRegistered())
-	{
-		FinalConstraint->RegisterComponent();
-	}
-	
-	if (!CableToEndpointConstraint->IsRegistered())
-	{
-		
-		CableToEndpointConstraint->SetAngularTwistLimit(ACM_Locked, 0);
-		CableToEndpointConstraint->SetAngularSwing1Limit(ACM_Limited, 90);
-		CableToEndpointConstraint->SetAngularSwing2Limit(ACM_Limited, 90);
-		CableToEndpointConstraint->SetLinearXLimit(LCM_Limited, 50.f);
-		CableToEndpointConstraint->SetLinearYLimit(LCM_Limited, 50.f);
-		CableToEndpointConstraint->SetLinearZLimit(LCM_Limited, 50.f);
-		CableToEndpointConstraint->SetAngularDriveParams(1000, 1000, 10);
-		CableToEndpointConstraint->SetLinearDriveParams(1000, 1000, 10);
-		CableToEndpointConstraint->SetupAttachment(GetEndComponent(), AttachEndToSocketName);
-		CableToEndpointConstraint->SetConstrainedComponents(GetEndComponent(), NAME_None, FinalCablePiece, NAME_None);
-		CableToEndpointConstraint->RegisterComponent();
-	}
+	FVector Delta = GetEndPosition() - LastCable->GetSocketLocation(UCablePiece::EndSocketName);
+	LastCable->SetWorldLocation(LastCable->GetComponentLocation() + Delta);
 }
-
 
 void AROVPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {

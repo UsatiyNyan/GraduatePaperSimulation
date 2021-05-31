@@ -15,7 +15,6 @@ public class Simulation : ModuleRules
 			"Engine",
 			"InputCore",
 			"HeadMountedDisplay",
-			"OpenCL"
 		});
 	}
 }
