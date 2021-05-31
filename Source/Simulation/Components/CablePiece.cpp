@@ -45,6 +45,8 @@ void UCablePiece::SetupThis(uint32_t CableId, float Density, float WaterDensity,
 	WeakPhysicsConstraintComponent->SetLinearXLimit(LCM_Locked, 0.f);
 	WeakPhysicsConstraintComponent->SetLinearYLimit(LCM_Locked, 0.f);
 	WeakPhysicsConstraintComponent->SetLinearZLimit(LCM_Locked, 0.f);
+	WeakPhysicsConstraintComponent->SetAngularBreakable(false, 1000000);
+	WeakPhysicsConstraintComponent->SetLinearBreakable(false, 1000000);
 	WeakPhysicsConstraintComponent->SetupAttachment(AttachableComponent, AttachableComponentSocketName);
 	WeakAttachableComponent = AttachableComponent;
 }

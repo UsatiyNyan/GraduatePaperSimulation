@@ -43,6 +43,8 @@ AROVPawn::AROVPawn() : Super{}
 	// FloatingPawnMovement
 	MovementComponent = CreateDefaultSubobject<UFloatingPawnMovement>("FloatingPawnMovement");
 	MovementComponent->SetUpdatedComponent(MeshComponent);
+	MovementComponent->MaxSpeed = MaxWinchVelocity * 0.9;
+	MovementComponent->Acceleration = MaxWinchVelocity / 4;
 
 	// CameraBoomComponent
 	CameraBoomComponent = CreateDefaultSubobject<USpringArmComponent>("CameraBoomComponent");
@@ -84,6 +86,7 @@ void AROVPawn::BeginPlay()
 	{
 		CreateCablePiece(DeltaRotation);
 	}
+	FixLastPiece();
 
 	// WinchControlSystem
 	WinchControlSystem = std::make_unique<FSimpleWinchControlSystem>(Delta.Size(), MinWinchVelocity, MaxWinchVelocity,
@@ -95,6 +98,7 @@ void AROVPawn::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	TickCable(DeltaTime);
+	FixLastPiece();
 	ApplyForcesToCables();
 
 	DrawDebugSphere(GetWorld(), GetEndPosition(), CableOneLength, 12,
@@ -140,7 +144,6 @@ void AROVPawn::TickCable(const float DeltaTime)
 			LastCablePieceAndConstraint.Value->UnregisterComponent();
 		}
 	}
-	FixLastPiece();
 }
 
 void AROVPawn::ApplyForcesToCables()
@@ -192,11 +195,15 @@ void AROVPawn::CreateCablePiece(FRotator Rotation)
 }
 
 void AROVPawn::FixLastPiece()
-{
+{	
 	auto* LastCable = CablePiecesAndConstraints.Last().Key;
 
 	FVector Delta = GetEndPosition() - LastCable->GetSocketLocation(UCablePiece::EndSocketName);
-	LastCable->SetWorldLocation(LastCable->GetComponentLocation() + Delta);
+	if (Delta.Size() > CableOneLength)
+	{
+		Delta = Delta.GetSafeNormal() * (Delta.Size() - CableOneLength);
+		LastCable->SetWorldLocation(LastCable->GetComponentLocation() + Delta);
+	}
 }
 
 void AROVPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

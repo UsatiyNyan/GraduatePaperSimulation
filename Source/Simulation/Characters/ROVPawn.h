@@ -56,10 +56,10 @@ private:
 
 public: // Variables
 	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="cm/s"))
-	float MinWinchVelocity{20.f};
+	float MinWinchVelocity{50.f};
 
 	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="cm/s"))
-	float MaxWinchVelocity{100.f};
+	float MaxWinchVelocity{200.f};
 
 	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite)
 	float MinLooseness{1.3f};
@@ -86,7 +86,7 @@ public: // Variables
 	float CableTangentCoefficient{0.2f};
 
 	UPROPERTY(Category=WaterEnvironment, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="cm/s"))
-	FVector FlowVelocity{GetActorForwardVector() * -100};
+	FVector FlowVelocity{GetActorForwardVector() * -200};
 
 	UPROPERTY(Category=WaterEnvironment, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="kg/m^3"))
 	float WaterDensity{1025.f};
@@ -107,8 +107,8 @@ protected:
 private:
 	float OneCableTangentResistancePrecalculated; // precalculated in BeginPlay
 	float OneCableNormalResistancePrecalculated; // precalculated in BeginPlay
-	float CableDiameter;
-	float CableOneLength;
+	float CableDiameter; // precalculated in Constructor
+	float CableOneLength; // precalculated in Constructor
 
 	TArray<TPair<UCablePiece*, UPhysicsConstraintComponent*>> CablePiecesAndConstraints;
 	std::unique_ptr<IWinchControlSystem> WinchControlSystem;
