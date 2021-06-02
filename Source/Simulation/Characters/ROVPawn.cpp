@@ -201,7 +201,7 @@ void AROVPawn::FixLastPiece()
 	FVector Delta = GetEndPosition() - LastCable->GetSocketLocation(UCablePiece::EndSocketName);
 	if (Delta.Size() > CableOneLength)
 	{
-		Delta = Delta.GetSafeNormal() * (Delta.Size() - CableOneLength);
+		Delta = Delta.GetSafeNormal() * CableOneLength;
 		LastCable->SetWorldLocation(LastCable->GetComponentLocation() + Delta);
 	}
 }

@@ -18,6 +18,8 @@ UCablePiece::UCablePiece() : Super{}
 	SetSimulatePhysics(true);
 	SetMobility(EComponentMobility::Movable);
 	SetCollisionProfileName(UCollisionProfile::PhysicsActor_ProfileName);
+	SetLinearDamping(0.5);
+	SetAngularDamping(0.5);
 }
 
 void UCablePiece::SetupThis(uint32_t CableId, float Density, float WaterDensity,
