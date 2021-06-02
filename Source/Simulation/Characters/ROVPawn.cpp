@@ -10,7 +10,6 @@
 #include "GameFramework/FloatingPawnMovement.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Math/UnrealMathUtility.h"
-#include "Simulation/Components/FinalCablePiece.h"
 #include "Simulation/Components/WinchControlSystems/SimpleWinchControlSystem.h"
 
 constexpr auto ROVMeshCableSocketName = "CableSocket";
@@ -71,10 +70,10 @@ void AROVPawn::BeginPlay()
 	Super::BeginPlay();
 
 	// precalculated values
-	OneCableTangentResistancePrecalculated = CableTangentCoefficient * PI * CableDiameter * CableOneLength *
+	OneCableTangentResistancePrecalculated = CableTangentCoefficient * PI * CableDiameter / 100 * CableOneLength / 100 *
 		WaterDensity / 2;
 
-	OneCableNormalResistancePrecalculated = CableNormalCoefficient * CableDiameter * CableOneLength *
+	OneCableNormalResistancePrecalculated = CableNormalCoefficient * CableDiameter / 100 * CableOneLength / 100 *
 		WaterDensity / 2;
 
 	// initial cable length
@@ -134,7 +133,10 @@ void AROVPawn::TickCable(const float DeltaTime)
 			const auto LastAttachableComponentAndSocket = GetLastAttachableComponentAndSocket();
 			FVector Delta = EndPosition -
 				LastAttachableComponentAndSocket.Key->GetSocketLocation(LastAttachableComponentAndSocket.Value);
-			CreateCablePiece(Delta.Rotation());
+			if (Delta.Size() > CableOneLength / 2)
+			{
+				CreateCablePiece(Delta.Rotation());
+			}
 		}
 		else // OneCableDeltaLength < 0
 		{
@@ -148,6 +150,7 @@ void AROVPawn::TickCable(const float DeltaTime)
 
 void AROVPawn::ApplyForcesToCables()
 {
+	FVector SumForces{};
 	for (auto& CablePieceAndPhysicsConstraint : CablePiecesAndConstraints)
 	{
 		auto* CablePiece = CablePieceAndPhysicsConstraint.Key;
@@ -158,22 +161,30 @@ void AROVPawn::ApplyForcesToCables()
 		FVector TangentVelocity = TotalVelocity.ProjectOnTo(Rotation);
 		FVector NormalVelocity = TotalVelocity - TangentVelocity;
 
+		FVector TangentForce = TangentVelocity.SizeSquared() * OneCableTangentResistancePrecalculated *
+			TangentVelocity.GetSafeNormal();
+		FVector NormalForce = NormalVelocity.SizeSquared() * OneCableNormalResistancePrecalculated *
+			NormalVelocity.GetSafeNormal();
+
+		FVector TotalForce = TangentForce + NormalForce;
 		DrawDebugDirectionalArrow(GetWorld(), CablePiece->GetComponentLocation(),
-		                          CablePiece->GetComponentLocation() + TotalVelocity.GetSafeNormal() * CableOneLength,
+		                          CablePiece->GetComponentLocation() + TotalForce,
 		                          15, FColor::Blue, false, -1, 0, 6);
 
 		DrawDebugDirectionalArrow(GetWorld(), CablePiece->GetComponentLocation(),
-		                          CablePiece->GetComponentLocation() + TangentVelocity.GetSafeNormal() * CableOneLength,
+		                          CablePiece->GetComponentLocation() + TangentForce,
 		                          15, FColor::Cyan, false, -1, 0, 6);
 
 		DrawDebugDirectionalArrow(GetWorld(), CablePiece->GetComponentLocation(),
-		                          CablePiece->GetComponentLocation() + NormalVelocity.GetSafeNormal() * CableOneLength,
+		                          CablePiece->GetComponentLocation() + NormalForce,
 		                          15, FColor::Magenta, false, -1, 0, 6);
 
-		FVector TangentForce = TangentVelocity.SizeSquared() * TangentVelocity.GetSafeNormal();
-		FVector NormalForce = NormalVelocity.SizeSquared() * NormalVelocity.GetSafeNormal();
-		CablePiece->AddForce(CablePiece->GetWaterDisplacementForce() + TangentForce + NormalForce);
+		SumForces -= TotalForce;
+		CablePiece->AddForce(TotalForce + CablePiece->GetWaterDisplacementForce());
 	}
+
+	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Purple,
+	                                 FString::Printf(TEXT("SumForces: %f"), SumForces.Size()));
 }
 
 void AROVPawn::CreateCablePiece(FRotator Rotation)
@@ -195,13 +206,13 @@ void AROVPawn::CreateCablePiece(FRotator Rotation)
 }
 
 void AROVPawn::FixLastPiece()
-{	
+{
 	auto* LastCable = CablePiecesAndConstraints.Last().Key;
 
 	FVector Delta = GetEndPosition() - LastCable->GetSocketLocation(UCablePiece::EndSocketName);
 	if (Delta.Size() > CableOneLength)
 	{
-		Delta = Delta.GetSafeNormal() * (Delta.Size() - CableOneLength);
+		Delta = Delta.GetSafeNormal() * CableOneLength;
 		LastCable->SetWorldLocation(LastCable->GetComponentLocation() + Delta);
 	}
 }

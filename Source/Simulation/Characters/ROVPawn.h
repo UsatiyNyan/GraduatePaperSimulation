@@ -9,7 +9,6 @@
 #include "GameFramework/Pawn.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "Simulation/Components/CablePiece.h"
-#include "Simulation/Components/FinalCablePiece.h"
 #include "Simulation/Components/WinchControlSystems/IWinchControlSystem.h"
 #include "ROVPawn.generated.h"
 
