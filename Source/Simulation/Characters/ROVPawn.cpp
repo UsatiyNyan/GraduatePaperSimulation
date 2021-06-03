@@ -213,8 +213,8 @@ void AROVPawn::FixLastPiece()
 	if (Delta.Size() > CableOneLength)
 	{
 		Delta = Delta.GetSafeNormal() * CableOneLength;
-		LastCable->SetWorldLocation(LastCable->GetComponentLocation() + Delta);
 	}
+	LastCable->SetWorldLocation(LastCable->GetComponentLocation() + Delta);
 }
 
 void AROVPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
