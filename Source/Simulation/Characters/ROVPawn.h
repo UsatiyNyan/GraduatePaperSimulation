@@ -28,7 +28,7 @@ public:
 
 private:
 	void TickCable(const float DeltaTime);
-	void ApplyForcesToCables();
+	void ApplyForcesToCables(const float DeltaTime);
 	void CreateCablePiece(FRotator Rotation);
 	void FixLastPiece();
 
@@ -36,6 +36,7 @@ protected: // Inputs
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	void MoveForward(float Amount);
+	void Fly(float Amount);
 
 	void RollRotation(float Amount);
 	void PitchRotation(float Amount);
@@ -54,17 +55,11 @@ private:
 	TPair<UPrimitiveComponent*, FName> GetLastAttachableComponentAndSocket();
 
 public: // Variables
-	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="cm/s"))
-	float MinWinchVelocity{50.f};
-
-	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite, meta=(ToolTip="cm/s"))
-	float MaxWinchVelocity{200.f};
-
 	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite)
 	float MinLooseness{1.3f};
 
 	UPROPERTY(Category=ControlSystem, EditAnywhere, BlueprintReadWrite)
-	float MaxLooseness{1.6f};
+	float MaxLooseness{1.35f};
 
 	UPROPERTY(Category=ROV, EditAnywhere, BlueprintReadWrite)
 	float DragCoefficient{0.22f};

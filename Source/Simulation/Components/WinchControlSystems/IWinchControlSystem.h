@@ -1,23 +1,18 @@
 ﻿#pragma once
 
+#include "Winch.h"
+
 class IWinchControlSystem
 {
 public:
-	IWinchControlSystem(float InitialLength, float MinVelocity, float MaxVelocity, float MinLooseness, float MaxLooseness)
-		: CurrentLength{InitialLength},
-		  MinVelocity{MinVelocity},
-		  MaxVelocity{MaxVelocity},
-		  MinLooseness{MinLooseness},
-		  MaxLooseness{MaxLooseness}
+	IWinchControlSystem(float InitialLength)
+		: CurrentLength{InitialLength}
 	{
 	}
 
 	virtual ~IWinchControlSystem() = default;
 
-	void Tick(const float DeltaTime, const FVector& ROVPosition, const FVector& ROVVelocity)
-	{
-		CurrentLength += DeltaTime * CalculateWinchVelocity(ROVPosition, ROVVelocity);
-	}
+	virtual void Tick(const float DeltaTime, const float DesiredLength, const float CounteractingForce) = 0;
 
 	float GetCurrentLength() const
 	{
@@ -25,12 +20,8 @@ public:
 	}
 
 protected:
-	virtual float CalculateWinchVelocity(const FVector& ROVPosition, const FVector& ROVVelocity) = 0;
-
-protected:
 	float CurrentLength;
-	float MinVelocity;
-	float MaxVelocity;
-	float MinLooseness;
-	float MaxLooseness;
+	FWinch Winch{};
+
+	static constexpr float DrumRadius = 0.4f;
 };

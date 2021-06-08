@@ -11,6 +11,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Math/UnrealMathUtility.h"
 #include "Simulation/Components/WinchControlSystems/SimpleWinchControlSystem.h"
+#include "Simulation/Components/WinchControlSystems/MyControlSystem.h"
 
 constexpr auto ROVMeshCableSocketName = "CableSocket";
 
@@ -42,8 +43,8 @@ AROVPawn::AROVPawn() : Super{}
 	// FloatingPawnMovement
 	MovementComponent = CreateDefaultSubobject<UFloatingPawnMovement>("FloatingPawnMovement");
 	MovementComponent->SetUpdatedComponent(MeshComponent);
-	MovementComponent->MaxSpeed = MaxWinchVelocity * 0.9;
-	MovementComponent->Acceleration = MaxWinchVelocity / 4;
+	MovementComponent->MaxSpeed = 200;
+	MovementComponent->Acceleration = 40;
 
 	// CameraBoomComponent
 	CameraBoomComponent = CreateDefaultSubobject<USpringArmComponent>("CameraBoomComponent");
@@ -61,8 +62,8 @@ AROVPawn::AROVPawn() : Super{}
 	const auto* CableMesh = ConstructorHelpers::FObjectFinder<UStaticMesh>(
 		TEXT("StaticMesh'/Game/Simulation/Cable.Cable'")).Object;
 	const FVector CableMeshMeasures = CableMesh->GetBoundingBox().GetSize();
-	CableOneLength = CableMeshMeasures.GetAbsMax();
-	CableDiameter = CableMeshMeasures.GetAbsMin();
+	CableOneLength = CableMeshMeasures.X;
+	CableDiameter = CableMeshMeasures.Y;
 }
 
 void AROVPawn::BeginPlay()
@@ -88,8 +89,7 @@ void AROVPawn::BeginPlay()
 	FixLastPiece();
 
 	// WinchControlSystem
-	WinchControlSystem = std::make_unique<FSimpleWinchControlSystem>(Delta.Size(), MinWinchVelocity, MaxWinchVelocity,
-	                                                                 MinLooseness, MaxLooseness);
+	WinchControlSystem = std::make_unique<FMyControlSystem>(Delta.Size());
 }
 
 void AROVPawn::Tick(float DeltaTime)
@@ -98,7 +98,7 @@ void AROVPawn::Tick(float DeltaTime)
 
 	TickCable(DeltaTime);
 	FixLastPiece();
-	ApplyForcesToCables();
+	ApplyForcesToCables(DeltaTime);
 
 	DrawDebugSphere(GetWorld(), GetEndPosition(), CableOneLength, 12,
 	                FColor::Red, false, -1, 0, 1);
@@ -109,11 +109,6 @@ void AROVPawn::Tick(float DeltaTime)
 void AROVPawn::TickCable(const float DeltaTime)
 {
 	const FVector EndPosition = GetEndPosition();
-	const FVector ROVPosition = MeshComponent->GetSocketLocation(ROVMeshCableSocketName) - EndPosition;
-	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Emerald,
-	                                 "ROVPosition: " + ROVPosition.ToString());
-
-	WinchControlSystem->Tick(DeltaTime, ROVPosition, MovementComponent->Velocity);
 
 	const float WholeCableDiscreteLength = CableOneLength * CablePiecesAndConstraints.Num();
 	const float WholeCableLength = WinchControlSystem->GetCurrentLength();
@@ -133,10 +128,10 @@ void AROVPawn::TickCable(const float DeltaTime)
 			const auto LastAttachableComponentAndSocket = GetLastAttachableComponentAndSocket();
 			FVector Delta = EndPosition -
 				LastAttachableComponentAndSocket.Key->GetSocketLocation(LastAttachableComponentAndSocket.Value);
-			if (Delta.Size() > CableOneLength / 2)
-			{
+			// if (Delta.Size() > CableOneLength / 2)
+			// {
 				CreateCablePiece(Delta.Rotation());
-			}
+			// }
 		}
 		else // OneCableDeltaLength < 0
 		{
@@ -148,7 +143,7 @@ void AROVPawn::TickCable(const float DeltaTime)
 	}
 }
 
-void AROVPawn::ApplyForcesToCables()
+void AROVPawn::ApplyForcesToCables(const float DeltaTime)
 {
 	FVector SumForces{};
 	for (auto& CablePieceAndPhysicsConstraint : CablePiecesAndConstraints)
@@ -184,7 +179,18 @@ void AROVPawn::ApplyForcesToCables()
 	}
 
 	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Purple,
-	                                 FString::Printf(TEXT("SumForces: %f"), SumForces.Size()));
+	                                 FString::Printf(
+		                                 TEXT("SumForces: %f, CableLength: %f, Diameter: %f"), SumForces.Size(),
+		                                 CableOneLength * CablePiecesAndConstraints.Num() / 100, CableDiameter));
+
+
+	const FVector ROVPosition = MeshComponent->GetSocketLocation(ROVMeshCableSocketName) - GetEndPosition();
+	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Emerald,
+	                                 "ROVPosition: " + ROVPosition.ToString());
+
+	const float DesiredLength = FMath::Clamp(WinchControlSystem->GetCurrentLength() / ROVPosition.Size(),
+	                                         MinLooseness, MaxLooseness) * ROVPosition.Size();
+	WinchControlSystem->Tick(DeltaTime, DesiredLength, SumForces.Size());
 }
 
 void AROVPawn::CreateCablePiece(FRotator Rotation)
@@ -222,6 +228,7 @@ void AROVPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	check(PlayerInputComponent);
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &AROVPawn::MoveForward);
+	PlayerInputComponent->BindAxis("Fly", this, &AROVPawn::Fly);
 
 	PlayerInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
 	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
@@ -240,6 +247,13 @@ void AROVPawn::MoveForward(float Amount)
 	if (Amount == 0.f) { return; }
 
 	MovementComponent->AddInputVector(GetActorForwardVector() * Amount, true);
+}
+
+void AROVPawn::Fly(float Amount)
+{
+	if (Amount == 0.f) { return; }
+
+	MovementComponent->AddInputVector(FVector{0.f, 0.f, Amount}, true);
 }
 
 void AROVPawn::RollRotation(float Amount)
