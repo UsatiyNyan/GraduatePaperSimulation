@@ -7,3 +7,8 @@ void FSimpleWinchControlSystem::Tick(const float DeltaTime, const float DesiredL
 	Winch.Tick(DeltaTime, Error, CounteractingForce * DrumRadius);
 	CurrentLength += Winch.GetAngularSpeed() * DrumRadius;
 }
+
+std::string FSimpleWinchControlSystem::GetLogName() const
+{
+	return "SimpleControlSystem.txt";
+}

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 
+#include <fstream>
 #include <memory>
 
 #include "GameFramework/Pawn.h"
@@ -106,4 +107,6 @@ private:
 
 	TArray<TPair<UCablePiece*, UPhysicsConstraintComponent*>> CablePiecesAndConstraints;
 	std::unique_ptr<IWinchControlSystem> WinchControlSystem;
+	
+	std::ofstream log_file_{};
 };

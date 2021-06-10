@@ -2,6 +2,8 @@
 
 #include "Winch.h"
 
+#include <string>
+
 class IWinchControlSystem
 {
 public:
@@ -18,6 +20,8 @@ public:
 	{
 		return CurrentLength;
 	}
+
+	virtual std::string GetLogName() const = 0;
 
 protected:
 	float CurrentLength;

@@ -1,6 +1,6 @@
 ﻿#include "MyControlSystem.h"
 
-namespace 
+namespace
 {
 	constexpr float Kp = 7.8;
 	constexpr float Ki = 3.6;
@@ -22,4 +22,9 @@ void FMyControlSystem::Tick(const float DeltaTime, const float DesiredLength, co
 	
 	Winch.Tick(DeltaTime, ControlVoltage, CounteractingForce * DrumRadius);
 	CurrentLength += Winch.GetAngularSpeed() * DrumRadius;
+}
+
+std::string FMyControlSystem::GetLogName() const
+{
+	return "MyControlSystemLog.txt";
 }

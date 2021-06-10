@@ -90,6 +90,7 @@ void AROVPawn::BeginPlay()
 
 	// WinchControlSystem
 	WinchControlSystem = std::make_unique<FMyControlSystem>(Delta.Size());
+	log_file_.open(WinchControlSystem->GetLogName());
 }
 
 void AROVPawn::Tick(float DeltaTime)
@@ -130,7 +131,7 @@ void AROVPawn::TickCable(const float DeltaTime)
 				LastAttachableComponentAndSocket.Key->GetSocketLocation(LastAttachableComponentAndSocket.Value);
 			// if (Delta.Size() > CableOneLength / 2)
 			// {
-				CreateCablePiece(Delta.Rotation());
+			CreateCablePiece(Delta.Rotation());
 			// }
 		}
 		else // OneCableDeltaLength < 0
@@ -180,17 +181,21 @@ void AROVPawn::ApplyForcesToCables(const float DeltaTime)
 
 	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Purple,
 	                                 FString::Printf(
-		                                 TEXT("SumForces: %f, CableLength: %f, Diameter: %f"), SumForces.Size(),
-		                                 CableOneLength * CablePiecesAndConstraints.Num() / 100, CableDiameter));
+		                                 TEXT("SumForces: %f, CableLength: %f"), SumForces.Size(),
+		                                 CableOneLength * CablePiecesAndConstraints.Num() / 100));
 
 
 	const FVector ROVPosition = MeshComponent->GetSocketLocation(ROVMeshCableSocketName) - GetEndPosition();
 	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Emerald,
-	                                 "ROVPosition: " + ROVPosition.ToString());
+	                                 "ROVPosition: " + (ROVPosition / 100).ToString());
+	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.f, FColor::Emerald,
+	                                 FString::Printf(TEXT("ROVDistance: %f"), (ROVPosition / 100).Size()));
 
 	const float DesiredLength = FMath::Clamp(WinchControlSystem->GetCurrentLength() / ROVPosition.Size(),
 	                                         MinLooseness, MaxLooseness) * ROVPosition.Size();
 	WinchControlSystem->Tick(DeltaTime, DesiredLength, SumForces.Size());
+	
+	log_file_ << DesiredLength << ";" << WinchControlSystem->GetCurrentLength() << std::endl; 
 }
 
 void AROVPawn::CreateCablePiece(FRotator Rotation)

@@ -73,7 +73,7 @@ void UCablePiece::BeginPlay()
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(INDEX_NONE, 10.f, FColor::Blue,
-										FString::Printf(TEXT("Created CableId: %d | Mass: %f"), Id, GetMass()));	
+										FString::Printf(TEXT("Created CableId: %d"), Id));	
 	}
 }
 
